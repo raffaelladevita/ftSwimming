@@ -15,8 +15,17 @@ import org.jlab.clas.physics.Particle;
 import org.jlab.groot.base.GStyle;
 import org.jlab.groot.data.GraphErrors;
 import org.jlab.groot.graphics.EmbeddedCanvasTabbed;
+import org.jlab.groot.graphics.EmbeddedCanvas;
 import org.jlab.groot.group.DataGroup;
 import org.jlab.utils.groups.IndexedList;
+
+import cnuphys.rk4.IStopper;
+import cnuphys.swim.Swimmer;
+import cnuphys.swim.SwimTrajectory;
+import cnuphys.magfield.Solenoid;
+import java.io.File;
+import java.io.FileNotFoundException;
+
 
 /*
 * Analyze tracking results
@@ -49,9 +58,27 @@ public class swimTest {
     int nEvents = 0;
     
     double ebeam = 10.6;
+    
+    static Swimmer solSwimmer=null;
+    static Solenoid solMap=null;
+    final double swimStepSize=0.001; // m
+    final double swimStepSave=0.001; // m
+    final double swimMaxDistance=2.5; // m
+    
+    public class FTStopper implements IStopper {
+        private double vertexPlane=0; // m
+        public boolean stopIntegration(double t,double[] y) {
+            final double xx=y[SwimTrajectory.X_IDX];
+            final double yy=y[SwimTrajectory.Y_IDX];
+            final double zz=y[SwimTrajectory.Z_IDX];
+            final double radius = Math.sqrt(xx*xx+yy*yy);
+            return zz<=vertexPlane;
+        }
+        public double getFinalT() { return 0; }
+        public void setFinalT(double finalT) { }
+    }
 
-
-    public static void main(String arg[]){
+    public static void main(String arg[]) throws FileNotFoundException{
         
 //  System.setProperty("java.awt.headless", "true"); // this should disable the Xwindow requirement
     GStyle.getAxisAttributesX().setTitleFontSize(24);
@@ -70,13 +97,19 @@ public class swimTest {
     GStyle.getH1FAttributes().setLineWidth(1);
     GStyle.getH1FAttributes().setOptStat("1111");
         
+    
         swimTest ttest = new swimTest();
+        
+        File solMapFile=new File("/Users/devita/NetBeansProjects/clas12-offline-software/coatjava/etc/data/magfield/Symm_solenoid_r601_phi1_z1201_13June2018.dat");
+        solMap=Solenoid.fromBinaryFile(solMapFile);
+        swimTest.solSwimmer=new Swimmer(solMap);
+
         
         ttest.setAnalysisTabNames("test","FitTest2D");
         ttest.createHistos();
   
         HipoDataSource reader = new HipoDataSource();
-        reader.open("/Users/noraimnunez/Documents/GitHub/ftSwimming/out_out.hipo");
+        reader.open("/Users/devita/out_out.hipo");
 
         while (reader.hasEvent()) {
             DataEvent event = reader.getNextEvent();
@@ -95,10 +128,11 @@ public class swimTest {
         ttest.plotHistos();
    //     System.out.println("done");    
     }
+    
     private void processEvent(DataEvent event) {
  
         nEvents++;
-        if((nEvents%1000) == 0) System.out.println("Analyzed" + nEvents + "events");
+        if((nEvents%1000) == 0) System.out.println("Analyzed " + nEvents + " events");
     
         DataBank recRun = null;
         DataBank mcBank = null;
@@ -140,12 +174,40 @@ public class swimTest {
                 
                 double datagroupphi = Math.toDegrees(Math.atan2(cy, cx)); 
                 double datagrouptheta = Math.toDegrees(Math.acos(cz)); 
+                
+                double swimphi   = Math.toDegrees(Math.atan2(-cy, -cx)); 
+                double swimtheta = Math.toDegrees(Math.acos(-cz)); 
+                
+                FTStopper ftStopper = new FTStopper();
+                
+                int charge=-1;
+
+
+                SwimTrajectory traj=solSwimmer.swim(charge,x/100,y/100,z/100,
+                        energy,swimtheta,swimphi,
+                        ftStopper,swimMaxDistance,swimStepSize,swimStepSave);
+                traj.computeBDL(solMap);
+//                for(int istep=0; istep<traj.size(); istep++) {
+//                    System.out.println(traj.get(istep)[SwimTrajectory.Z_IDX] + " " + traj.get(istep)[SwimTrajectory.PATHLEN_IDX] );
+//                }
+                double[] lastStep = traj.get(traj.size()-1);
+                double pathLength = lastStep[SwimTrajectory.PATHLEN_IDX]*100; //cm
+                double zvertex    = lastStep[SwimTrajectory.Z_IDX]*100;
+                double vertexCX = -lastStep[SwimTrajectory.DIRCOSX_IDX];
+                double vertexCY = -lastStep[SwimTrajectory.DIRCOSY_IDX];
+                double vertexCZ = -lastStep[SwimTrajectory.DIRCOSZ_IDX];
+                double vertexPhi   = Math.toDegrees(Math.atan2(vertexCY, vertexCX)); 
+                double vertexTheta = Math.toDegrees(Math.acos(vertexCZ)); 
+
+//                System.out.println(phi + " " + " " + datagroupphi +" "+ vertexPhi);
+
                                                 
                 dataGroups.getItem(1).getH2F("hi_cal_E_phi").fill(energy,datagroupphi);
                 dataGroups.getItem(1).getH2F("hi_cal_E_theta").fill(energy,datagrouptheta); 
                 dataGroups.getItem(1).getH2F("Diff #phi Vs Energy").fill(energy, -datagroupphi +phi); 
+                dataGroups.getItem(1).getH2F("Swim: Diff #phi Vs Energy").fill(energy, -vertexPhi + phi); 
                 dataGroups.getItem(1).getH2F("Diff #theta Vs Energy").fill(energy,-datagrouptheta +theta);
-                        System.out.println(energy + " " + Math.toDegrees(Math.acos(cz) - Math.acos(p_z)));             
+//                        System.out.println(energy + " " + Math.toDegrees(Math.acos(cz) - Math.acos(p_z)));             
                 dataGroups.getItem(1).getH1F("hi_cal_e_ch").fill(energy);
                 dataGroups.getItem(1).getH1F("hi_cal_theta_ch").fill(Math.toDegrees(Math.acos(cz)));
                 dataGroups.getItem(1).getH1F("hi_cal_phi_ch").fill(datagroupphi);                 
@@ -161,6 +223,7 @@ public class swimTest {
         H2F histogramh2d = new H2F("hi_cal_E_phi", 100, 0, 5, 100, 0, 190);           
         H2F histogramh2d2 = new H2F("Diff #phi Vs Energy", 100, 1.0, 4.9, 100,3.0, 25);  
         H2F histogramd2D = new H2F("Diff #theta Vs Energy", 100, 0.5, 4.9, 100,-0.4, 0.5);  
+        H2F histogramhSwim2d2 = new H2F("Swim: Diff #phi Vs Energy", 100, 1.0, 4.9, 100,-5, 5);  
         
         histogram2d.setTitle("hi_cal_E_theta2D"); 
         histogram2d.setTitleX("Energy"); 
@@ -226,6 +289,7 @@ public class swimTest {
         dc_calo.addDataSet(histogramh2d,     7); 
         dc_calo.addDataSet(histogramh2d2,    8);         
         dc_calo.addDataSet(histogramd2D,     9);
+        dc_calo.addDataSet(histogramhSwim2d2, 10);
      
         dataGroups.add(dc_calo, 1);
     }
@@ -245,6 +309,7 @@ public class swimTest {
         canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH2F("Diff #phi Vs Energy"));
         canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getF1D("func_phi"),"same");  
         canvasTabbed.getCanvas("test").cd(5); 
+        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH2F("Swim: Diff #phi Vs Energy"));
 
         canvasTabbed.getCanvas("FitTest2D").cd(0);
         canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getH2F("hi_cal_E_theta"));
