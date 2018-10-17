@@ -37,7 +37,7 @@ public class swimTest {
     
     static final boolean debug=false;
     
-    String  analysisName = "Fit Test";
+    String  analysisName = "Swimming Test";
     
     IndexedList<DataGroup> dataGroups      = new IndexedList<DataGroup>(1);
     EmbeddedCanvasTabbed   canvasTabbed    = null;
@@ -55,7 +55,6 @@ public class swimTest {
     int nNegTrackEvents = 0;
     int nTwoTrackEvents = 0;
     
-    int nEvents = 0;
     
     double ebeam = 10.6;
     
@@ -80,41 +79,44 @@ public class swimTest {
     }
 
     public static void main(String arg[]) throws FileNotFoundException{
-        
+
 //  System.setProperty("java.awt.headless", "true"); // this should disable the Xwindow requirement
-    GStyle.getAxisAttributesX().setTitleFontSize(24);
-    GStyle.getAxisAttributesX().setLabelFontSize(18);  
-    GStyle.getAxisAttributesY().setTitleFontSize(24);
-    GStyle.getAxisAttributesY().setLabelFontSize(18);
-    GStyle.getAxisAttributesZ().setLabelFontSize(14);
+        GStyle.getAxisAttributesX().setTitleFontSize(24);
+        GStyle.getAxisAttributesX().setLabelFontSize(18);
+        GStyle.getAxisAttributesY().setTitleFontSize(24);
+        GStyle.getAxisAttributesY().setLabelFontSize(18);
+        GStyle.getAxisAttributesZ().setLabelFontSize(14);
 //  GStyle.setPalette("kDefault");
-    GStyle.getAxisAttributesX().setLabelFontName("Avenir");
-    GStyle.getAxisAttributesY().setLabelFontName("Avenir");
-    GStyle.getAxisAttributesZ().setLabelFontName("Avenir");
-    GStyle.getAxisAttributesX().setTitleFontName("Avenir");
-    GStyle.getAxisAttributesY().setTitleFontName("Avenir");
-    GStyle.getAxisAttributesZ().setTitleFontName("Avenir");
-    GStyle.setGraphicsFrameLineWidth(1);
-    GStyle.getH1FAttributes().setLineWidth(1);
-    GStyle.getH1FAttributes().setOptStat("1111");
-        
-    
+        GStyle.getAxisAttributesX().setLabelFontName("Avenir");
+        GStyle.getAxisAttributesY().setLabelFontName("Avenir");
+        GStyle.getAxisAttributesZ().setLabelFontName("Avenir");
+        GStyle.getAxisAttributesX().setTitleFontName("Avenir");
+        GStyle.getAxisAttributesY().setTitleFontName("Avenir");
+        GStyle.getAxisAttributesZ().setTitleFontName("Avenir");
+        GStyle.setGraphicsFrameLineWidth(1);
+        GStyle.getH1FAttributes().setLineWidth(1);
+        GStyle.getH1FAttributes().setOptStat("1111");
+
+
         swimTest ttest = new swimTest();
-       
-        File solMapFile=new File("/Users/devita/NetBeansProjects/clas12-offline-software/coatjava/etc/data/magfield/Symm_solenoid_r601_phi1_z1201_13June2018.dat");
-        solMap=Solenoid.fromBinaryFile(solMapFile);
-        swimTest.solSwimmer=new Swimmer(solMap);
-        
-        ttest.setAnalysisTabNames("test","FitTest2D");
+
+        File solMapFile = new File("/Users/devita/NetBeansProjects/clas12-offline-software/coatjava/etc/data/magfield/Symm_solenoid_r601_phi1_z1201_13June2018.dat");
+        solMap = Solenoid.fromBinaryFile(solMapFile);
+        swimTest.solSwimmer = new Swimmer(solMap);
+
+        ttest.setAnalysisTabNames("Path", "Theta", "Phi");
         ttest.createHistos();
-  
+
         HipoDataSource reader = new HipoDataSource();
         reader.open("/Users/devita/out_out.hipo");
 
-        while (reader.hasEvent()) {
+        int nEvents = 0;
+        while (reader.hasEvent() && nEvents < 100000) {
             DataEvent event = reader.getNextEvent();
 //            event.show();
-        ttest.processEvent(event);
+            nEvents++;
+            if ((nEvents % 1000) == 0) System.out.println("Analyzed " + nEvents + " events");
+            ttest.processEvent(event);
         }
         reader.close();
 
@@ -126,15 +128,10 @@ public class swimTest {
 
         ttest.analyze();
         ttest.plotHistos();
-   //     System.out.println("done");    
-
     }    
 
     private void processEvent(DataEvent event) {
- 
-        nEvents++;
-        if((nEvents%1000) == 0) System.out.println("Analyzed " + nEvents + " events");
-    
+     
         DataBank recRun = null;
         DataBank mcBank = null;
         DataBank ftCalClusters = null;
@@ -144,226 +141,227 @@ public class swimTest {
         int ev = recRun.getInt("event",0);
 
         if (ftCalClusters != null && mcBank != null) {
-            Particle p1 = null;
-            Particle p2 = null;
 //            mcBank.show();          
-                double px = mcBank.getFloat("px", 0); 
-                double py = mcBank.getFloat("py", 0); 
-                double pz = mcBank.getFloat("pz", 0); 
-// Magnitude/Normalization
-                double length = Math.sqrt(px*px+py*py+pz*pz);   
-                double p_x = px/length; 
-                double p_y = py/length;
-                double p_z = pz/length; 
-  //Angle                      
-                double phi = Math.toDegrees(Math.atan2(p_y, p_x));              
-                double theta = Math.toDegrees(Math.acos(p_z)); 
-// double lengthG = Math.sqrt(px*px+py*py+pz*pz);   
-               
-        for(int i=0; i<ftCalClusters.rows(); i++) {             
-                                
-                double energy  = ftCalClusters.getFloat("energy", i);
+            double px = mcBank.getFloat("px", 0); 
+            double py = mcBank.getFloat("py", 0); 
+            double pz = mcBank.getFloat("pz", 0); 
+            // Magnitude/Normalization
+            double p = Math.sqrt(px * px + py * py + pz * pz);
+            double ux = px / p;
+            double uy = py / p;
+            double uz = pz / p;
+            //Angle                      
+            double phi = Math.toDegrees(Math.atan2(uy, ux));
+            double theta = Math.toDegrees(Math.acos(uz));
+
+            for (int i = 0; i < ftCalClusters.rows(); i++) {
+
+                double energy = ftCalClusters.getFloat("energy", i);
                 double energyR = ftCalClusters.getFloat("recEnergy", i);
-                int    size    = ftCalClusters.getInt("size", i);
-                double x       = ftCalClusters.getFloat("x", i);
-                double y       = ftCalClusters.getFloat("y", i);
-                double z       = ftCalClusters.getFloat("z", i);
-                double path = Math.sqrt(x*x+y*y+z*z);
-                double time = ftCalClusters.getFloat("time", i)-path/29.97;
-                double cx=x/path;
-                double cy=y/path;
-                double cz=z/path;
+                int size = ftCalClusters.getInt("size", i);
+                double x = ftCalClusters.getFloat("x", i);
+                double y = ftCalClusters.getFloat("y", i);
+                double z = ftCalClusters.getFloat("z", i);
+                double path = Math.sqrt(x * x + y * y + z * z);
+                double time = ftCalClusters.getFloat("time", i) - path / 29.97;
+                double cx = x / path;
+                double cy = y / path;
+                double cz = z / path;
+                double phirec   = Math.toDegrees(Math.atan2(cy, cx));
+                double thetarec = Math.toDegrees(Math.acos(cz));
 
-                double datagroupphi = Math.toDegrees(Math.atan2(cy, cx)); 
-                double datagrouptheta = Math.toDegrees(Math.acos(cz)); 
-                
-                double swimphi   = Math.toDegrees(Math.atan2(-cy, -cx)); 
-                double swimtheta = Math.toDegrees(Math.acos(-cz)); 
-                
-                double pathG = Math.sqrt(x*x+y*y+z*z);
-               
-                
-                
+                double swimphi = Math.toDegrees(Math.atan2(-cy, -cx));
+                double swimtheta = Math.toDegrees(Math.acos(-cz));
                 FTStopper ftStopper = new FTStopper();
-                
-                int charge=-1;
-
-                SwimTrajectory traj=solSwimmer.swim(charge,x/100,y/100,z/100,
-                        energy,swimtheta,swimphi,
-                        ftStopper,swimMaxDistance,swimStepSize,swimStepSave);
+                int charge = -1;
+                SwimTrajectory traj = solSwimmer.swim(charge, x / 100, y / 100, z / 100,
+                        energy, swimtheta, swimphi,
+                        ftStopper, swimMaxDistance, swimStepSize, swimStepSave);
                 traj.computeBDL(solMap);
-//                for(int istep=0; istep<traj.size(); istep++) {
-//                    System.out.println(traj.get(istep)[SwimTrajectory.Z_IDX] + " " + traj.get(istep)[SwimTrajectory.PATHLEN_IDX] );
-//                }
-                double[] lastStep = traj.get(traj.size()-1);
-                double pathLength = lastStep[SwimTrajectory.PATHLEN_IDX]*100; //cm
-                double zvertex    = lastStep[SwimTrajectory.Z_IDX]*100;
-                double vertexCX = -lastStep[SwimTrajectory.DIRCOSX_IDX];
-                double vertexCY = -lastStep[SwimTrajectory.DIRCOSY_IDX];
-                double vertexCZ = -lastStep[SwimTrajectory.DIRCOSZ_IDX];
-                double vertexPhi   = Math.toDegrees(Math.atan2(vertexCY, vertexCX)); 
-                double vertexTheta = Math.toDegrees(Math.acos(vertexCZ)); 
+                double[] lastStep  = traj.get(traj.size() - 1);
+                double pathLength  = lastStep[SwimTrajectory.PATHLEN_IDX] * 100; //cm
+                double zvertex     = lastStep[SwimTrajectory.Z_IDX] * 100;
+                double vertexCX    = -lastStep[SwimTrajectory.DIRCOSX_IDX];
+                double vertexCY    = -lastStep[SwimTrajectory.DIRCOSY_IDX];
+                double vertexCZ    = -lastStep[SwimTrajectory.DIRCOSZ_IDX];
+                double vertexPhi   = Math.toDegrees(Math.atan2(vertexCY, vertexCX));
+                double vertexTheta = Math.toDegrees(Math.acos(vertexCZ));
+                double swimpath    = lastStep[SwimTrajectory.PATHLEN_IDX] * 100; //cm
 
-                double pathLengthG = lastStep[SwimTrajectory.PATHLEN_IDX]*100; //cm
-              
-                
 //                System.out.println(phi + " " + " " + datagroupphi +" "+ vertexPhi);
-
-                                               
-                             
-                dataGroups.getItem(1).getH2F("hi_cal_E_phi").fill(energy,datagroupphi);
-                dataGroups.getItem(1).getH2F("hi_cal_E_theta").fill(energy,datagrouptheta); 
-                dataGroups.getItem(1).getH2F("Diff #phi Vs Energy").fill(energy, -datagroupphi +phi); 
-                dataGroups.getItem(1).getH2F("Swim: Diff #phi Vs Energy").fill(energy, -vertexPhi + phi); 
-                dataGroups.getItem(1).getH2F("Diff #theta Vs Energy").fill(energy,-datagrouptheta +theta);
-//                        System.out.println(energy + " " + Math.toDegrees(Math.acos(cz) - Math.acos(p_z)));             
                 dataGroups.getItem(1).getH1F("hi_cal_e_ch").fill(energy);
-                dataGroups.getItem(1).getH1F("hi_cal_theta_ch").fill(Math.toDegrees(Math.acos(cz)));
-                dataGroups.getItem(1).getH1F("hi_cal_phi_ch").fill(datagroupphi);                 
-dataGroups.getItem(1).getH2F ("Vertix Pathlength vs Energy").fill(energy, +pathLengthG -pathG);
-dataGroups.getItem(1).getH2F ("Swim: mctheta-vtheta Vs Energy").fill(energy, vertexTheta - theta);
+                dataGroups.getItem(1).getH2F("hi_cal_e_phi").fill(energy, phirec);
+                dataGroups.getItem(1).getH2F("hi_cal_e_theta").fill(energy, thetarec);
+                dataGroups.getItem(1).getH2F("hi_cal_e_pathdiff").fill(energy, +swimpath - path);
 
-                
+                dataGroups.getItem(1).getH1F("hi_cal_theta_ch").fill(Math.toDegrees(Math.acos(cz)));
+                dataGroups.getItem(1).getH2F("hi_cal_e_dtheta").fill(energy, theta - thetarec);
+                dataGroups.getItem(1).getH2F("hi_cal_e_dtheta_swim").fill(energy, vertexTheta - thetarec);
+                dataGroups.getItem(1).getH2F("hi_cal_e_dthetav_swim").fill(energy, theta - vertexTheta);
+                dataGroups.getItem(1).getH2F("hi_cal_e_dthetav_corr").fill(energy, theta - thetarec - dataGroups.getItem(1).getF1D("func_theta").evaluate(energy));
+
+                dataGroups.getItem(1).getH1F("hi_cal_phi_ch").fill(phirec);
+                dataGroups.getItem(1).getH2F("hi_cal_e_dphi").fill(energy, phi - phirec);
+                dataGroups.getItem(1).getH2F("hi_cal_e_dphi_swim").fill(energy, vertexPhi - phirec);
+                dataGroups.getItem(1).getH2F("hi_cal_e_dphiv_swim").fill(energy, phi - vertexPhi);
+                dataGroups.getItem(1).getH2F("hi_cal_e_dphiv_corr").fill(energy, phi - phirec - dataGroups.getItem(1).getF1D("func_phi").evaluate(energy));
+
+            }
         }
     }
-}
     private void createHistos() {
         // Calorimeter
         DataGroup dc_calo = new DataGroup(2,20);
        
-        H2F histogram2d = new H2F("hi_cal_E_theta", 100, 0, 5, 100, 2, 5); 
-        H2F histogram2d2 = new H2F("hi_cal_E_theta2", 100, 0, 7, 100, 2, 5.5);  
-        H2F histogramh2d = new H2F("hi_cal_E_phi", 100, 0, 5, 100, 0, 190);           
-        H2F histogramh2d2 = new H2F("Diff #phi Vs Energy", 100, 1.0, 4.9, 100,3.0, 25);  
-        H2F histogramd2D = new H2F("Diff #theta Vs Energy", 100, 0.5, 4.9, 100,-0.4, 0.5);  
-        H2F histogramhSwim2d2 = new H2F("Swim: Diff #phi Vs Energy", 100, 1.0, 4.9, 100,-5, 5);  
-        H2F histogramPath = new H2F("Vertix Pathlength vs Energy", 100, 0.5, 5, 100, -0.03, 0.10); 
-        H2F histogramhSwim2D = new H2F("Swim: mctheta-vtheta Vs Energy", 100, 0.5, 4.9, 100,-0.4, 0.5); 
+        H1F hi_cal_e_ch = new H1F("hi_cal_e_ch", "Energy (GeV)", "Counts", 100, 0, 5); 
+        hi_cal_e_ch.setFillColor(2);
+        H2F hi_cal_e_theta = new H2F("hi_cal_e_theta", 100, 0.25, 5.25, 100, 2, 5); 
+        hi_cal_e_theta.setTitle("hi_cal_e_theta"); 
+        hi_cal_e_theta.setTitleX("Energy (GeV)"); 
+        hi_cal_e_theta.setTitleY("#theta (deg)");	
+        H2F hi_cal_e_phi = new H2F("hi_cal_e_phi", 100, 0.25, 5.25, 100, -180,180); 
+        hi_cal_e_phi.setTitle("hi_cal_e_phi"); 
+        hi_cal_e_phi.setTitleX("Energy (GeV)"); 
+        hi_cal_e_phi.setTitleY("#phi (deg)");
+        H2F hi_cal_e_dpath = new H2F("hi_cal_e_pathdiff", 100, 0.25, 5.25, 100, -0.03, 0.10); 
+        hi_cal_e_dpath.setTitle("#Delta Path vs Energy");     
+        hi_cal_e_dpath.setTitleX("Energy (GeV)"); 
+        hi_cal_e_dpath.setTitleY("#Delta Path (cm)"); 
 
-        
-        histogram2d.setTitle("hi_cal_E_theta2D"); 
-        histogram2d.setTitleX("Energy"); 
-        histogram2d.setTitleY("Angle");	
-        histogram2d2.setTitle("hi_cal_E_theta2"); 
-        histogram2d2.setTitleX("Energy");
-        histogram2d2.setTitleY("Angle");
-        histogramh2d.setTitle("#phi 2D");
-        histogramh2d.setTitleX("#phi");
-        histogramh2d.setTitleY("Angle"); 
-        histogramh2d2.setTitle("Mc #phi -rec #phi Vs. Energy");           
-        histogramh2d2.setTitleX("Energy");
-        histogramh2d2.setTitleY("Difference #phi");  
-        histogramd2D.setTitle("Mc #theta -rec #theta Vs. Energy");        
-        histogramd2D.setTitleX("Energy");
-        histogramd2D.setTitleY("Difference #theta"); 
-        histogramhSwim2d2.setTitle("Swim: Diff #phi Vs Energy");     
-        histogramhSwim2d2.setTitleX("Energy"); 
-        histogramhSwim2d2.setTitleY("Diff #phi"); 
-        histogramhSwim2D.setTitle("Swim: Diff #theta Vs Energy");     
-        histogramhSwim2D.setTitleX("Energy"); 
-        histogramhSwim2D.setTitleY("mctheta-vtheta"); 
-        histogramPath.setTitle("Vertix Pathlength vs Energy");     
-        histogramPath.setTitleX("Energy"); 
-        histogramPath.setTitleY("vertixpathlength"); 
-
-                
-                double phicorr0 = 4.918;
-                double phicorr1 = -3.828; 
-                double phicorr2 = 3.841; 
-                double phicorr3 = -1.256; 
-                double phicorr4 = 2.874; 
-                double phicorr5 = -0.2195; 
-                double thetacorr0 = 1.797; 
-                double thetacorr1 = -4.485;
-                double thetacorr2 = -0.8671; 
-                double thetacorr3 = -1.078;  
-        
-    F1D func_theta = new F1D("func_theta","exp([t0] + [t1] * x)+exp([t2] + [t3] * x)", 1.0, 4.7); 
+        H1F hi_cal_theta_ch = new H1F("hi_cal_theta_ch","#theta (deg)", "Counts", 100, 2, 5); 
+        hi_cal_theta_ch.setFillColor(2);
+        H2F hi_cal_e_dtheta = new H2F("hi_cal_e_dtheta", 100, 0.25, 5.25, 100,-0.4, 0.5);  
+        hi_cal_e_dtheta.setTitle("#Delta#theta (MC-Rec) vs. Energy");        
+        hi_cal_e_dtheta.setTitleX("Energy (GeV)");
+        hi_cal_e_dtheta.setTitleY("#Delta#theta (deg)"); 
+        double thetacorr0 = 1.797; 
+        double thetacorr1 = -4.485;
+        double thetacorr2 = -0.8671; 
+        double thetacorr3 = -1.078;  
+        F1D func_theta = new F1D("func_theta","exp([t0] + [t1] * x)+exp([t2] + [t3] * x)", 1.0, 4.7); 
         func_theta.setParameter(0, thetacorr0);
         func_theta.setParameter(1, thetacorr1);
         func_theta.setParameter(2, thetacorr2);
         func_theta.setParameter(3, thetacorr3);
         func_theta.setLineWidth(2);
+        H2F hi_cal_e_dtheta_swim = new H2F("hi_cal_e_dtheta_swim", 100, 0.25, 5.25, 100,-0.4, 0.5); 
+        hi_cal_e_dtheta_swim.setTitle("#Delta#theta (Swim-Rec) vs. Energy");     
+        hi_cal_e_dtheta_swim.setTitleX("Energy (GeV)"); 
+        hi_cal_e_dtheta_swim.setTitleY("#Delta#theta (deg)"); 
+        H2F hi_cal_e_dthetav_swim = new H2F("hi_cal_e_dthetav_swim", 100, 0.25, 5.25, 100,-0.4, 0.5); 
+        hi_cal_e_dthetav_swim.setTitle("Delta#theta (MC-Swim) vs. Energy");     
+        hi_cal_e_dthetav_swim.setTitleX("Energy"); 
+        hi_cal_e_dthetav_swim.setTitleY("#Delta#theta (deg)"); 
+        H2F hi_cal_e_dthetav_corr = new H2F("hi_cal_e_dthetav_corr", 100, 0.25, 5.25, 100,-0.4, 0.5);  
+        hi_cal_e_dthetav_corr.setTitle("#Delta#theta (MC-RecCorr) vs. Energy");        
+        hi_cal_e_dthetav_corr.setTitleX("Energy (GeV)");
+        hi_cal_e_dthetav_corr.setTitleY("#Delta#theta (deg)"); 
         
-//   F1D func_thetaA = new F1D("func_theta","exp([t0] + [t1] * x)+exp([t2] + [t3] * x)", 1.0, 4.7); 
-//        func_thetaA.setParameter(0, thetacorr0);
-//        func_thetaA.setParameter(1, thetacorr1);
-//        func_thetaA.setParameter(2, thetacorr2);
-//        func_thetaA.setParameter(3, thetacorr3);
-//        func_thetaA.setLineWidth(2);
-//        func_thetaA.setLineColor(4);     
-//        ftheta.setFillColor(2);
-  
-    F1D func_phi = new F1D("func_phi", "exp([p0] + [p1] * x)+exp([p2] + [p3] * x)+exp([p4] + [p5] * x)", 1.3, 4.7);
+
+        H1F hi_cal_phi_ch = new H1F("hi_cal_phi_ch", "#phi (deg)", "Counts", 100, -200,200); 
+        hi_cal_phi_ch.setFillColor(2);              
+        H2F hi_cal_e_dphi = new H2F("hi_cal_e_dphi", 100, 0.25, 5.25, 100, 3.0, 25);  
+        hi_cal_e_dphi.setTitle("#Delta#phi (MC-Rec) vs. Energy");           
+        hi_cal_e_dphi.setTitleX("Energy (GeV)");
+        hi_cal_e_dphi.setTitleY("#delta#phi (deg)");  
+        double phicorr0 = 4.918;
+        double phicorr1 = -3.828; 
+        double phicorr2 = 3.841; 
+        double phicorr3 = -1.256; 
+        double phicorr4 = 2.874; 
+        double phicorr5 = -0.2195; 
+        F1D func_phi = new F1D("func_phi", "exp([p0] + [p1] * x)+exp([p2] + [p3] * x)+exp([p4] + [p5] * x)", 1.3, 4.7);
         func_phi.setParameter(0, phicorr0);
         func_phi.setParameter(1, phicorr1);
         func_phi.setParameter(2, phicorr2);
         func_phi.setParameter(3, phicorr3);
         func_phi.setParameter(4, phicorr4);
         func_phi.setParameter(5, phicorr5);
-        func_phi.setLineWidth(2);
+        func_phi.setLineWidth(2); 
+        H2F hi_cal_e_dphi_swim = new H2F("hi_cal_e_dphi_swim", 100, 0.25, 5.25, 100, 3, 25);  
+        hi_cal_e_dphi_swim.setTitle("#Delta#phi (Swim-Rec) vs. Energy");     
+        hi_cal_e_dphi_swim.setTitleX("Energy (GeV)"); 
+        hi_cal_e_dphi_swim.setTitleY("#Delta#phi (deg)"); 
+        H2F hi_cal_e_dphiv_swim = new H2F("hi_cal_e_dphiv_swim", 100, 0.25, 5.25, 100,-5, 5);  
+        hi_cal_e_dphiv_swim.setTitle("#Delta#phi (MC-Swim) vs. Energy");     
+        hi_cal_e_dphiv_swim.setTitleX("Energy (GeV)"); 
+        hi_cal_e_dphiv_swim.setTitleY("#Delta#phi (deg)"); 
+        H2F hi_cal_e_dphiv_corr = new H2F("hi_cal_e_dphiv_corr", 100, 0.25, 5.25, 100,-5, 5);  
+        hi_cal_e_dphiv_corr.setTitle("#Delta#phi (MC-RecCorr) vs. Energy");     
+        hi_cal_e_dphiv_corr.setTitleX("Energy (GeV)"); 
+        hi_cal_e_dphiv_corr.setTitleY("#Delta#phi (deg)"); 
         
-        H1F hi_cal_e_ch = new H1F("hi_cal_e_ch", "E (GeV/c^2)", "Counts", 100, 0, 5); 
-        hi_cal_e_ch.setFillColor(2);
-        H1F hi_cal_nclusters = new H1F("hi_cal_nclusters", 5, 0, 5.5);    
-        hi_cal_nclusters.setFillColor(44);
-        H1F hi_cal_theta_ch = new H1F("hi_cal_theta_ch","#theta (deg)", "Counts", 100, 2, 5); 
-        hi_cal_theta_ch.setFillColor(2);
-        H1F hi_cal_phi_ch = new H1F("hi_cal_phi_ch", "#phi (deg)", "Counts", 100, -200,200); 
-        hi_cal_phi_ch.setFillColor(2);              
-        
-        dc_calo.addDataSet(func_phi,         0);
-        dc_calo.addDataSet(func_theta,       1);
-        dc_calo.addDataSet(histogram2d,      2);
-        dc_calo.addDataSet(hi_cal_e_ch,      3);
-        dc_calo.addDataSet(hi_cal_theta_ch,  4);
-        dc_calo.addDataSet(hi_cal_phi_ch,    5);
-        dc_calo.addDataSet(histogram2d2,     6);
-        dc_calo.addDataSet(histogramh2d,     7); 
-        dc_calo.addDataSet(histogramh2d2,    8);         
-        dc_calo.addDataSet(histogramd2D,     9);
-        dc_calo.addDataSet(histogramhSwim2d2,10);    
-        dc_calo.addDataSet(histogramPath,    11);
-        dc_calo.addDataSet(histogramhSwim2D, 12);
-//      dc_calo.addDataSet(func_thetaA,      13);
+        dc_calo.addDataSet(hi_cal_e_ch,          0);
+        dc_calo.addDataSet(hi_cal_e_theta,       1);
+        dc_calo.addDataSet(hi_cal_e_phi,         2);
+        dc_calo.addDataSet(hi_cal_e_dpath,       3);
+        dc_calo.addDataSet(hi_cal_theta_ch,      4);
+        dc_calo.addDataSet(hi_cal_e_dtheta,      5);
+        dc_calo.addDataSet(func_theta,           5);
+        dc_calo.addDataSet(hi_cal_e_dtheta_swim, 6);
+        dc_calo.addDataSet(hi_cal_e_dthetav_swim,7);
+        dc_calo.addDataSet(hi_cal_e_dthetav_corr,8);
+        dc_calo.addDataSet(hi_cal_phi_ch,        9);
+        dc_calo.addDataSet(hi_cal_e_dphi,       10);         
+        dc_calo.addDataSet(func_phi,            10);
+        dc_calo.addDataSet(hi_cal_e_dphi_swim,  11);    
+        dc_calo.addDataSet(hi_cal_e_dphiv_swim, 12);    
+        dc_calo.addDataSet(hi_cal_e_dphiv_corr, 13);    
      
         dataGroups.add(dc_calo, 1);
     }
     private void plotHistos() {
 
-        canvasTabbed.getCanvas("test").divide(3,2);
-        canvasTabbed.getCanvas("test").setGridX(false);
-        canvasTabbed.getCanvas("test").setGridY(false); 
-        canvasTabbed.getCanvas("FitTest2D").divide(2,2);
-        canvasTabbed.getCanvas("FitTest2D").setGridX(false);
-        canvasTabbed.getCanvas("FitTest2D").setGridY(false);
-        canvasTabbed.getCanvas("test").cd(0);
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH1F("hi_cal_phi_ch"));
-        canvasTabbed.getCanvas("test").cd(1);
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH2F("hi_cal_E_phi"));
-        canvasTabbed.getCanvas("test").cd(2);
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH2F("Diff #phi Vs Energy"));
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getF1D("func_phi"),"same");  
-        canvasTabbed.getCanvas("test").cd(3);
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH2F("Vertix Pathlength vs Energy"));
-        canvasTabbed.getCanvas("test").cd(4);
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH2F("Swim: mctheta-vtheta Vs Energy"));
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getF1D("func_theta"),"same");  
-        canvasTabbed.getCanvas("test").cd(5); 
-        canvasTabbed.getCanvas("test").draw(dataGroups.getItem(1).getH2F("Swim: Diff #phi Vs Energy"));
+        canvasTabbed.getCanvas("Path").divide(2,2);
+        canvasTabbed.getCanvas("Path").setGridX(false);
+        canvasTabbed.getCanvas("Path").setGridY(false);         
+        canvasTabbed.getCanvas("Theta").divide(3,2);
+        canvasTabbed.getCanvas("Theta").setGridX(false);
+        canvasTabbed.getCanvas("Theta").setGridY(false);
+        canvasTabbed.getCanvas("Phi").divide(3,2);
+        canvasTabbed.getCanvas("Phi").setGridX(false);
+        canvasTabbed.getCanvas("Phi").setGridY(false); 
 
-        canvasTabbed.getCanvas("FitTest2D").cd(0);
-        canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getH2F("hi_cal_E_theta"));
-        canvasTabbed.getCanvas("FitTest2D").cd(1);
-        canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getH1F("hi_cal_e_ch"));
-        canvasTabbed.getCanvas("FitTest2D").cd(2);
-        canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getH1F("hi_cal_theta_ch"));
-        canvasTabbed.getCanvas("FitTest2D").cd(3);
-//canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getF1D("func_thetaA"),"same");  
-//canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getH2F("Swim: mctheta-vtheta Vs Energy"));
-        canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getH2F("Diff #theta Vs Energy"));
-        canvasTabbed.getCanvas("FitTest2D").draw(dataGroups.getItem(1).getF1D("func_theta"),"same");
-        canvasTabbed.getCanvas("FitTest2D").cd(4); 
+        canvasTabbed.getCanvas("Path").cd(0);
+        canvasTabbed.getCanvas("Path").draw(dataGroups.getItem(1).getH1F("hi_cal_e_ch"));
+        canvasTabbed.getCanvas("Path").cd(1);
+        canvasTabbed.getCanvas("Path").draw(dataGroups.getItem(1).getH2F("hi_cal_e_theta"));
+        canvasTabbed.getCanvas("Path").cd(2);
+        canvasTabbed.getCanvas("Path").draw(dataGroups.getItem(1).getH2F("hi_cal_e_phi"));
+        canvasTabbed.getCanvas("Path").cd(3);
+        canvasTabbed.getCanvas("Path").draw(dataGroups.getItem(1).getH2F("hi_cal_e_pathdiff"));
+        
+        
+        canvasTabbed.getCanvas("Theta").cd(0);
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getH1F("hi_cal_theta_ch"));
+        canvasTabbed.getCanvas("Theta").cd(1);
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getH2F("hi_cal_e_theta"));
+        canvasTabbed.getCanvas("Theta").cd(2);
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dtheta"));
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getF1D("func_theta"),"same");
+        canvasTabbed.getCanvas("Theta").cd(3); 
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dtheta_swim"));
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getF1D("func_theta"),"same");  
+        canvasTabbed.getCanvas("Theta").cd(4); 
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dthetav_swim"));
+        canvasTabbed.getCanvas("Theta").cd(5); 
+        canvasTabbed.getCanvas("Theta").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dthetav_corr"));
+
+        canvasTabbed.getCanvas("Phi").cd(0);
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getH1F("hi_cal_phi_ch"));
+        canvasTabbed.getCanvas("Phi").cd(1);
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getH2F("hi_cal_e_phi"));
+        canvasTabbed.getCanvas("Phi").cd(2);
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dphi"));
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getF1D("func_phi"),"same");  
+        canvasTabbed.getCanvas("Phi").cd(3); 
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dphi_swim"));
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getF1D("func_phi"),"same");  
+        canvasTabbed.getCanvas("Phi").cd(4); 
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dphiv_swim"));
+        canvasTabbed.getCanvas("Phi").cd(5); 
+        canvasTabbed.getCanvas("Phi").draw(dataGroups.getItem(1).getH2F("hi_cal_e_dphiv_corr"));
+
     } 
     private void analyze() {
 //        System.out.println("Updating TBT");
@@ -395,7 +393,7 @@ dataGroups.getItem(1).getH2F ("Swim: mctheta-vtheta Vs Energy").fill(energy, ver
         f1vz.setParameter(1, mean);
         f1vz.setParameter(2, sigma);
         f1vz.setRange(mean-2.*sigma,mean+2.*sigma);
-        DataFitter.fit(f1vz, hivz, "FitTest2D"); //No options uses error for sigma 
+        DataFitter.fit(f1vz, hivz, "Q"); //No options uses error for sigma 
         hivz.setFunction(null);
     }
 
@@ -407,10 +405,10 @@ dataGroups.getItem(1).getH2F ("Swim: mctheta-vtheta Vs Energy").fill(energy, ver
         f1mc.setParameter(1, mean);
         f1mc.setParameter(2, sigma);
         f1mc.setRange(mean-2.*sigma,mean+2.*sigma);
-        DataFitter.fit(f1mc, himc, "FitTest2D"); //No options uses error for sigma 
+        DataFitter.fit(f1mc, himc, "Q"); //No options uses error for sigma 
         sigma = Math.abs(f1mc.getParameter(2));  
         f1mc.setRange(mean-2.*sigma,mean+2.*sigma);
-        DataFitter.fit(f1mc, himc, "FitTest2D"); //No options uses error for sigma 
+        DataFitter.fit(f1mc, himc, "Q"); //No options uses error for sigma 
         himc.setFunction(null);
     }
     
@@ -430,7 +428,7 @@ dataGroups.getItem(1).getH2F ("Swim: mctheta-vtheta Vs Energy").fill(energy, ver
             f1.setParameter(1, mean);
             f1.setParameter(2, sigma);
             f1.setRange(mean-2.*sigma,mean+2.*sigma);
-            DataFitter.fit(f1, hslice.get(i), "FitTest2D"); //No options uses error for sigma 
+            DataFitter.fit(f1, hslice.get(i), "Q"); //No options uses error for sigma 
             if(amp>50) grmc.addPoint(x, f1.getParameter(2), ex, f1.parameter(2).error());
         }
 
